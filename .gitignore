@@ -1,0 +1,6 @@
+shl_env/
+.env
+__pycache__/
+vector_db/
+*.pyc
+chroma_db/
