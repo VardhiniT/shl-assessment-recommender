@@ -1,87 +1,45 @@
-from contextlib import asynccontextmanager
-
+import threading
 from fastapi import FastAPI
-
 from pydantic import BaseModel
-
 from typing import List
-
 from rag.chatbot import chat
 
+app = FastAPI()
 
 # --------------------------------------------------
-# WARMUP ON STARTUP
-# pre-loads embedding model + ChromaDB before
-# the first request arrives — prevents slow first call
+# BACKGROUND WARMUP
+# Runs AFTER server is up and port is bound
+# Does not block startup
 # --------------------------------------------------
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-
-    print("Warming up embedding model and vector DB...")
-
+def warmup():
     try:
-
         from rag.embeddings import embedding_model
         from rag.vector_store import collection
-
         embedding_model.encode("warmup")
         collection.get(limit=1)
-
         print("Warmup complete.")
-
     except Exception as e:
+        print(f"Warmup error (non-fatal): {e}")
 
-        print(f"Warmup warning (non-fatal): {e}")
+threading.Thread(target=warmup, daemon=True).start()
 
-    yield
-
-
-app = FastAPI(lifespan=lifespan)
-
-
-# --------------------------------------------------
-# REQUEST SCHEMA
-# --------------------------------------------------
 
 class Message(BaseModel):
-
     role: str
     content: str
 
-
 class ChatRequest(BaseModel):
-
     messages: List[Message]
-
-
-# --------------------------------------------------
-# CHAT ENDPOINT
-# --------------------------------------------------
 
 @app.post("/chat")
 def chat_endpoint(request: ChatRequest):
-
     messages = [
-        {
-            "role": m.role,
-            "content": m.content
-        }
+        {"role": m.role, "content": m.content}
         for m in request.messages
     ]
-
-    response = chat(messages)
-
-    return response
-
-
-# --------------------------------------------------
-# HEALTH ENDPOINT
-# --------------------------------------------------
+    return chat(messages)
 
 @app.get("/health")
 def health():
-
-    return {
-        "status": "ok"
-    }
+    return {"status": "ok"}
