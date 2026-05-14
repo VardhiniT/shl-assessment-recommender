@@ -1,3 +1,5 @@
+#preprocess_catalog.py
+
 import json
 
 INPUT_FILE = "data/assessments.json"
