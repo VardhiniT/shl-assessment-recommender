@@ -1,14 +1,7 @@
 # rag/retriever.py
 
-import numpy as np
-
-from rag.embeddings import (
-    embedding_model
-)
-
-from rag.vector_store import (
-    collection
-)
+from rag.embeddings import embedding_model
+from rag.vector_store import collection
 
 
 # --------------------------------------------------
@@ -32,7 +25,8 @@ def compute_seniority_score(
     query = query.lower()
 
     seniority_keywords = {
-        "entry": [
+
+        "entry":[
             "entry",
             "graduate",
             "junior",
@@ -40,13 +34,13 @@ def compute_seniority_score(
             "campus"
         ],
 
-        "mid": [
+        "mid":[
             "mid",
             "manager",
             "experienced"
         ],
 
-        "senior": [
+        "senior":[
             "senior",
             "director",
             "executive",
@@ -56,13 +50,11 @@ def compute_seniority_score(
         ]
     }
 
-    metadata_text = (
-        str(metadata).lower()
-    )
+    metadata_text = str(metadata).lower()
 
     score = 0.5
 
-    for level, keywords in seniority_keywords.items():
+    for level,keywords in seniority_keywords.items():
 
         query_match = any(
             k in query
@@ -78,11 +70,11 @@ def compute_seniority_score(
 
             score += 0.3
 
-    return min(score, 1.0)
+    return min(score,1.0)
 
 
 # --------------------------------------------------
-# SKILLS SCORING
+# SKILLS SCORE
 # --------------------------------------------------
 
 def compute_skills_score(
@@ -95,35 +87,39 @@ def compute_skills_score(
     )
 
     metadata_words = set(
-        str(metadata).lower().split()
+        str(metadata)
+        .lower()
+        .split()
     )
 
-    overlap = (
-        query_words.intersection(
-            metadata_words
-        )
+    overlap = query_words.intersection(
+        metadata_words
     )
 
     if not query_words:
         return 0.0
 
-    return len(overlap) / len(query_words)
+    return len(overlap)/len(query_words)
 
 
 # --------------------------------------------------
-# FINAL SCORING
+# FINAL SCORE
 # --------------------------------------------------
 
 def compute_final_score(
+
     role_score,
     seniority_score,
     skills_score
+
 ):
 
     return (
-        ROLE_WEIGHT * role_score
-        + SENIORITY_WEIGHT * seniority_score
-        + SKILLS_WEIGHT * skills_score
+
+        ROLE_WEIGHT*role_score
+        + SENIORITY_WEIGHT*seniority_score
+        + SKILLS_WEIGHT*skills_score
+
     )
 
 
@@ -132,125 +128,186 @@ def compute_final_score(
 # --------------------------------------------------
 
 def retrieve_assessments(
+
     query,
     state=None,
     top_k=5
+
 ):
 
-    # --------------------------------------
-    # EMBEDDING
-    # --------------------------------------
-
-    query_embedding = (
-        embedding_model.encode(query)
-        .tolist()
+    print(
+        "RETRIEVAL START",
+        flush=True
     )
 
-    # --------------------------------------
-    # VECTOR SEARCH
-    # --------------------------------------
+    try:
 
-    results = collection.query(
-        query_embeddings=[
-            query_embedding
-        ],
-        n_results=15
-    )
+        print(
+            "Creating embedding",
+            flush=True
+        )
 
-    retrieved_docs = results["documents"][0]
-    metadatas = results["metadatas"][0]
-    distances = results["distances"][0]
+        query_embedding = (
+            embedding_model
+            .encode(query)
+            .tolist()
+        )
 
-    ranked_results = []
+        print(
+            "Embedding created",
+            flush=True
+        )
 
-    # --------------------------------------
-    # RERANKING
-    # --------------------------------------
+        print(
+            "Running Chroma query",
+            flush=True
+        )
 
-    for doc, metadata, distance in zip(
+        results = collection.query(
+
+            query_embeddings=[
+                query_embedding
+            ],
+
+            n_results=10
+
+        )
+
+        print(
+            "Query completed",
+            flush=True
+        )
+
+    except Exception as e:
+
+        print(
+            "RETRIEVAL ERROR:",
+            str(e),
+            flush=True
+        )
+
+        return []
+
+
+    try:
+
+        retrieved_docs=results["documents"][0]
+
+        metadatas=results["metadatas"][0]
+
+        distances=results["distances"][0]
+
+    except Exception as e:
+
+        print(
+            "RESULT PARSING ERROR:",
+            str(e),
+            flush=True
+        )
+
+        return []
+
+
+    ranked_results=[]
+
+    for doc,metadata,distance in zip(
+
         retrieved_docs,
         metadatas,
         distances
+
     ):
 
-        role_score = (
-            1 - distance
+        role_score=(1-distance)
+
+        seniority_score=compute_seniority_score(
+            query,
+            metadata
         )
 
-        seniority_score = (
-            compute_seniority_score(
-                query,
-                metadata
-            )
+        skills_score=compute_skills_score(
+            query,
+            metadata
         )
 
-        skills_score = (
-            compute_skills_score(
-                query,
-                metadata
-            )
-        )
+        final_score=compute_final_score(
 
-        final_score = (
-            compute_final_score(
-                role_score,
-                seniority_score,
-                skills_score
-            )
+            role_score,
+            seniority_score,
+            skills_score
+
         )
 
         ranked_results.append({
-            "name": metadata.get(
+
+            "name":
+            metadata.get(
                 "name",
                 ""
             ),
 
-            "url": metadata.get(
+            "url":
+            metadata.get(
                 "url",
                 ""
             ),
 
-            "test_type": (
-                metadata.get("test_type")
-                or metadata.get("category")
-                or "Assessment"
-            ),
+            "test_type":
+            metadata.get(
+                "test_type"
+            )
+            or metadata.get(
+                "category"
+            )
+            or "Assessment",
 
-            "description": doc,
+            "description":
+            doc,
 
-            "scores": {
-                "role_score": round(
+            "scores":{
+
+                "role_score":
+                round(
                     role_score,
                     3
                 ),
 
-                "seniority_score": round(
+                "seniority_score":
+                round(
                     seniority_score,
                     3
                 ),
 
-                "skills_score": round(
+                "skills_score":
+                round(
                     skills_score,
                     3
                 ),
 
-                "final_score": round(
+                "final_score":
+                round(
                     final_score,
                     3
                 )
             }
+
         })
 
-    # --------------------------------------
-    # SORT BY FINAL SCORE
-    # --------------------------------------
 
-    ranked_results = sorted(
+    ranked_results=sorted(
+
         ranked_results,
-        key=lambda x: x["scores"][
-            "final_score"
-        ],
+
+        key=lambda x:
+        x["scores"]["final_score"],
+
         reverse=True
+
+    )
+
+    print(
+        f"Returning {len(ranked_results)} results",
+        flush=True
     )
 
     return ranked_results[:top_k]
