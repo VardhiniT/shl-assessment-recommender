@@ -342,8 +342,25 @@ def chat(messages):
 
     print("STEP 12: retrieving assessments")
 
-    # TEMP DEBUG: bypass retrieval
-    retrieved = []
+    retrieved = retrieve_assessments(
+        retrieval_query,
+        state
+    )
+
+    print(
+        f"Retrieved count: {len(retrieved)}",
+        flush=True
+    )
+
+    for item in retrieved[:5]:
+
+        print(
+            item.get(
+                "name",
+                "NO NAME"
+            ),
+            flush=True
+        )
 
     print("STEP 13: retrieval complete")
 
