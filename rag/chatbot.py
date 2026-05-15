@@ -342,10 +342,8 @@ def chat(messages):
 
     print("STEP 12: retrieving assessments")
 
-    retrieved = retrieve_assessments(
-        retrieval_query,
-        state
-    )
+    # TEMP DEBUG: bypass retrieval
+    retrieved = []
 
     print("STEP 13: retrieval complete")
 
