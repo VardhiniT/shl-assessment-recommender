@@ -176,248 +176,125 @@ def merge_recommendations(
 
 
 # --------------------------------------------------
-# EXTRACT COMPARISON NAMES FROM MESSAGE
-# More robust than simple string splitting —
-# handles "compare X and Y", "difference between
-# X and Y", "X vs Y" patterns
-# --------------------------------------------------
-
-def extract_compare_names(message):
-
-    text = message.lower()
-
-    # remove common filler words
-    for phrase in [
-        "what's the difference between",
-        "what is the difference between",
-        "compare",
-        "comparison between",
-        "difference between",
-        "contrast",
-    ]:
-        text = text.replace(phrase, "")
-
-    text = text.strip(" ?.!")
-
-    # split on "and" or "vs" or "versus"
-    for separator in [" vs ", " versus ", " and "]:
-        if separator in text:
-            parts = text.split(separator, 1)
-            return [
-                p.strip(" ?.!")
-                for p in parts
-                if len(p.strip()) >= 3
-            ]
-
-    # fallback — return the whole cleaned text
-    # as a single query so retrieval still runs
-    return [text.strip()] if text.strip() else []
-
-
-# --------------------------------------------------
 # MAIN CHAT FUNCTION
 # --------------------------------------------------
 
 def chat(messages):
 
-    try:
+    turns_remaining = (
+        MAX_TURNS - len(messages)
+    )
 
-        turns_remaining = (
-            MAX_TURNS - len(messages)
+    # --------------------------------------
+    # EXTRACT STATE
+    # --------------------------------------
+
+    state = extract_state(messages)
+
+    # --------------------------------------
+    # MISSING FIELDS
+    # --------------------------------------
+
+    missing_fields = get_missing_fields(
+        state
+    )
+
+    # --------------------------------------
+    # CONVERSATION ANALYSIS
+    # --------------------------------------
+
+    analysis = analyze_conversation(
+        messages=messages,
+        state=state,
+        missing_fields=missing_fields,
+        turns_remaining=turns_remaining
+    )
+
+    intent = analysis["intent"]
+
+    latest_user_message = (
+        messages[-1]["content"]
+    )
+
+    recommendations = []
+
+    # --------------------------------------
+    # STRATEGIES THAT SHOULD NEVER RETRIEVE
+    # --------------------------------------
+
+    NON_RECOMMENDATION_STRATEGIES = [
+        "ask_clarification",
+        "refuse_off_topic",
+        "refuse_legal",
+        "refuse_prompt_injection",
+        "close_conversation"
+    ]
+
+    # --------------------------------------
+    # NO RETRIEVAL CASES
+    # --------------------------------------
+
+    if (
+        analysis["response_strategy"]
+        in NON_RECOMMENDATION_STRATEGIES
+    ):
+
+        reply = generate_reply(
+            strategy=analysis[
+                "response_strategy"
+            ],
+
+            reply_instruction=analysis[
+                "reply_instruction"
+            ],
+
+            recommendations=[],
+
+            messages=messages
         )
 
-        # --------------------------------------
-        # EXTRACT STATE
-        # --------------------------------------
+        return {
+            "reply": reply,
+            "recommendations": [],
+            "end_of_conversation": analysis[
+                "end_conversation"
+            ]
+        }
+    # --------------------------------------
+    # COMPARISON FLOW
+    # --------------------------------------
 
-        state = extract_state(messages)
+    if (
+        analysis["response_strategy"]
+        == "compare_assessments"
+    ):
 
-        # --------------------------------------
-        # MISSING FIELDS
-        # --------------------------------------
-
-        missing_fields = get_missing_fields(
-            state
-        )
-
-        # --------------------------------------
-        # CONVERSATION ANALYSIS
-        # --------------------------------------
-
-        analysis = analyze_conversation(
-            messages=messages,
-            state=state,
-            missing_fields=missing_fields,
-            turns_remaining=turns_remaining
-        )
-
-        intent = analysis["intent"]
-
-        latest_user_message = (
+        latest_message = (
             messages[-1]["content"]
         )
 
-        recommendations = []
-
-        # --------------------------------------
-        # STRATEGIES THAT SHOULD NEVER RETRIEVE
-        # --------------------------------------
-
-        NON_RECOMMENDATION_STRATEGIES = [
-            "ask_clarification",
-            "refuse_off_topic",
-            "refuse_legal",
-            "refuse_prompt_injection",
-            "close_conversation"
-        ]
-
-        # --------------------------------------
-        # NO RETRIEVAL CASES
-        # --------------------------------------
-
-        if (
-            analysis["response_strategy"]
-            in NON_RECOMMENDATION_STRATEGIES
-        ):
-
-            reply = generate_reply(
-                strategy=analysis[
-                    "response_strategy"
-                ],
-
-                reply_instruction=analysis[
-                    "reply_instruction"
-                ],
-
-                recommendations=[],
-
-                messages=messages
-            )
-
-            return {
-                "reply": reply,
-                "recommendations": [],
-                "end_of_conversation": analysis[
-                    "end_conversation"
-                ]
-            }
-
-        # --------------------------------------
-        # COMPARISON FLOW
-        # --------------------------------------
-
-        if (
-            analysis["response_strategy"]
-            == "compare_assessments"
-        ):
-
-            compare_names = extract_compare_names(
-                latest_user_message
-            )
-
-            recommendations = (
-                retrieve_specific_assessments(
-                    compare_names
-                )
-            )
-
-            # fallback: if name extraction returned
-            # nothing, do a regular retrieval
-            if not recommendations:
-
-                retrieval_query = (
-                    build_retrieval_query(state)
-                    or latest_user_message
-                )
-
-                retrieved = retrieve_assessments(
-                    retrieval_query,
-                    state
-                )
-
-                recommendations = (
-                    build_recommendations(retrieved)
-                )
-
-            reply = generate_reply(
-                strategy=analysis[
-                    "response_strategy"
-                ],
-
-                reply_instruction=analysis[
-                    "reply_instruction"
-                ],
-
-                recommendations=recommendations,
-
-                messages=messages
-            )
-
-            return {
-                "reply": reply,
-
-                "recommendations":
-                    recommendations,
-
-                "end_of_conversation":
-                    analysis[
-                        "end_conversation"
-                    ]
-            }
-
-        # --------------------------------------
-        # BUILD RETRIEVAL QUERY
-        # --------------------------------------
-
-        retrieval_query = (
-            build_retrieval_query(
-                state
-            )
+        lower_message = (
+            latest_message.lower()
+            .replace("compare", "")
+            .replace(".", "")
         )
 
-        # --------------------------------------
-        # RETRIEVE RESULTS
-        # --------------------------------------
+        compare_names = []
 
-        retrieved = retrieve_assessments(
-            retrieval_query,
-            state
-        )
+        if " and " in lower_message:
 
-        new_recommendations = (
-            build_recommendations(
-                retrieved
-            )
-        )
-
-        # --------------------------------------
-        # REFINEMENT CONTINUITY
-        # --------------------------------------
-
-        if intent == "refine":
-
-            previous_recommendations = (
-                extract_previous_recommendations(
-                    messages
+            compare_names = [
+                x.strip()
+                for x in lower_message.split(
+                    " and "
                 )
+            ]
+
+        recommendations = (
+            retrieve_specific_assessments(
+                compare_names
             )
-
-            recommendations = (
-                merge_recommendations(
-                    previous_recommendations,
-                    new_recommendations
-                )
-            )
-
-        else:
-
-            recommendations = (
-                new_recommendations
-            )
-
-        # --------------------------------------
-        # GENERATE REPLY
-        # --------------------------------------
+        )
 
         reply = generate_reply(
             strategy=analysis[
@@ -433,35 +310,95 @@ def chat(messages):
             messages=messages
         )
 
-        # --------------------------------------
-        # FINAL RESPONSE
-        # --------------------------------------
-
         return {
             "reply": reply,
 
-            "recommendations": recommendations,
+            "recommendations":
+                recommendations,
 
-            "end_of_conversation": analysis[
-                "end_conversation"
-            ]
+            "end_of_conversation":
+                analysis[
+                    "end_conversation"
+                ]
         }
+    # --------------------------------------
+    # BUILD RETRIEVAL QUERY
+    # --------------------------------------
 
-    # ------------------------------------------
-    # SAFETY NET
-    # If anything crashes, return a clean response
-    # instead of a 500 error to the evaluator
-    # ------------------------------------------
+    retrieval_query = (
+        build_retrieval_query(
+            state
+        )
+    )
 
-    except Exception as e:
+    # --------------------------------------
+    # RETRIEVE RESULTS
+    # --------------------------------------
 
-        print(f"Chat error: {e}")
+    retrieved = retrieve_assessments(
+        retrieval_query,
+        state
+    )
 
-        return {
-            "reply": (
-                "I encountered an issue processing your request. "
-                "Please try again."
-            ),
-            "recommendations": [],
-            "end_of_conversation": False
-        }
+    new_recommendations = (
+        build_recommendations(
+            retrieved
+        )
+    )
+
+    # --------------------------------------
+    # REFINEMENT CONTINUITY
+    # --------------------------------------
+
+    if intent == "refine":
+
+        previous_recommendations = (
+            extract_previous_recommendations(
+                messages
+            )
+        )
+
+        recommendations = (
+            merge_recommendations(
+                previous_recommendations,
+                new_recommendations
+            )
+        )
+
+    else:
+
+        recommendations = (
+            new_recommendations
+        )
+
+    # --------------------------------------
+    # GENERATE REPLY
+    # --------------------------------------
+
+    reply = generate_reply(
+        strategy=analysis[
+            "response_strategy"
+        ],
+
+        reply_instruction=analysis[
+            "reply_instruction"
+        ],
+
+        recommendations=recommendations,
+
+        messages=messages
+    )
+
+    # --------------------------------------
+    # FINAL RESPONSE
+    # --------------------------------------
+
+    return {
+        "reply": reply,
+
+        "recommendations": recommendations,
+
+        "end_of_conversation": analysis[
+            "end_conversation"
+        ]
+    }
