@@ -1,7 +1,7 @@
 # rag/retriever.py
 
 from rag.embeddings import embedding_model
-from rag.vector_store import collection
+from rag.vector_store import client
 
 
 # --------------------------------------------------
@@ -159,15 +159,40 @@ def retrieve_assessments(
         )
 
         print(
-            "Testing collection",
+            "Loading client",
             flush=True
         )
 
         print(
-            f"Collection count: {collection.count()}",
+            client,
             flush=True
         )
 
+        print(
+            "Before get_collection",
+            flush=True
+        )
+
+        collection = client.get_collection(
+            "shl_assessments"
+        )
+
+        print(
+            "After get_collection",
+            flush=True
+        )
+
+        print(
+            "Before count",
+            flush=True
+        )
+
+        cnt = collection.count()
+
+        print(
+            f"Collection count: {cnt}",
+            flush=True
+        )
         return [
 
             {

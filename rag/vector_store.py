@@ -3,18 +3,30 @@ import chromadb
 
 from rag.embeddings import embedding_model
 
+
 CHROMA_PATH = "vector_db"
 
-client = chromadb.PersistentClient(path=CHROMA_PATH)
-
-collection = client.get_or_create_collection(
-    name="shl_assessments"
+client = chromadb.PersistentClient(
+    path=CHROMA_PATH
 )
+
+
+def get_collection():
+
+    return client.get_or_create_collection(
+        name="shl_assessments"
+    )
 
 
 def create_vector_db():
 
-    with open("data/processed_assessments.json", "r") as f:
+    collection = get_collection()
+
+    with open(
+        "data/processed_assessments.json",
+        "r"
+    ) as f:
+
         data = json.load(f)
 
     documents = []
@@ -24,23 +36,46 @@ def create_vector_db():
 
     for idx, item in enumerate(data):
 
-        search_text = item["search_text"]
+        search_text = item[
+            "search_text"
+        ]
 
-        embedding = embedding_model.encode(search_text).tolist()
+        embedding = (
+            embedding_model
+            .encode(search_text)
+            .tolist()
+        )
 
-        documents.append(search_text)
+        documents.append(
+            search_text
+        )
 
-        embeddings.append(embedding)
+        embeddings.append(
+            embedding
+        )
 
         metadatas.append({
-            "name": item["name"],
-            "url": item["url"],
-            "test_type": item["test_type"],
-            "duration": item["duration"],
-            "remote_testing": item["remote_testing"]
+
+            "name":
+            item["name"],
+
+            "url":
+            item["url"],
+
+            "test_type":
+            item["test_type"],
+
+            "duration":
+            item["duration"],
+
+            "remote_testing":
+            item["remote_testing"]
+
         })
 
-        ids.append(str(idx))
+        ids.append(
+            str(idx)
+        )
 
     collection.add(
         documents=documents,
@@ -49,8 +84,10 @@ def create_vector_db():
         ids=ids
     )
 
-    print("✅ Vector DB created successfully")
+    print(
+        "Vector DB created successfully"
+    )
 
 
-if __name__ == "__main__":
+if __name__=="__main__":
     create_vector_db()
