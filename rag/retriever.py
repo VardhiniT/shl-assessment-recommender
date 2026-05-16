@@ -1,12 +1,13 @@
-# rag/retriever.py
+import numpy as np
 
-from rag.embeddings import embedding_model
-from rag.vector_store import client
+from rag.embeddings import (
+    embedding_model
+)
 
+from rag.vector_store import (
+    collection
+)
 
-# --------------------------------------------------
-# WEIGHT CONFIGURATION
-# --------------------------------------------------
 
 ROLE_WEIGHT = 0.6
 SENIORITY_WEIGHT = 0.25
@@ -14,7 +15,7 @@ SKILLS_WEIGHT = 0.15
 
 
 # --------------------------------------------------
-# SENIORITY SCORING
+# SENIORITY SCORE
 # --------------------------------------------------
 
 def compute_seniority_score(
@@ -26,7 +27,7 @@ def compute_seniority_score(
 
     seniority_keywords = {
 
-        "entry":[
+        "entry": [
             "entry",
             "graduate",
             "junior",
@@ -34,13 +35,13 @@ def compute_seniority_score(
             "campus"
         ],
 
-        "mid":[
+        "mid": [
             "mid",
             "manager",
             "experienced"
         ],
 
-        "senior":[
+        "senior": [
             "senior",
             "director",
             "executive",
@@ -50,11 +51,13 @@ def compute_seniority_score(
         ]
     }
 
-    metadata_text = str(metadata).lower()
+    metadata_text = str(
+        metadata
+    ).lower()
 
     score = 0.5
 
-    for level,keywords in seniority_keywords.items():
+    for _, keywords in seniority_keywords.items():
 
         query_match = any(
             k in query
@@ -70,7 +73,10 @@ def compute_seniority_score(
 
             score += 0.3
 
-    return min(score,1.0)
+    return min(
+        score,
+        1.0
+    )
 
 
 # --------------------------------------------------
@@ -92,14 +98,22 @@ def compute_skills_score(
         .split()
     )
 
-    overlap = query_words.intersection(
-        metadata_words
+    overlap = (
+        query_words
+        .intersection(
+            metadata_words
+        )
     )
 
     if not query_words:
+
         return 0.0
 
-    return len(overlap)/len(query_words)
+    return (
+        len(overlap)
+        /
+        len(query_words)
+    )
 
 
 # --------------------------------------------------
@@ -107,18 +121,25 @@ def compute_skills_score(
 # --------------------------------------------------
 
 def compute_final_score(
-
     role_score,
     seniority_score,
     skills_score
-
 ):
 
     return (
 
-        ROLE_WEIGHT*role_score
-        + SENIORITY_WEIGHT*seniority_score
-        + SKILLS_WEIGHT*skills_score
+        ROLE_WEIGHT *
+        role_score
+
+        +
+
+        SENIORITY_WEIGHT *
+        seniority_score
+
+        +
+
+        SKILLS_WEIGHT *
+        skills_score
 
     )
 
@@ -128,11 +149,9 @@ def compute_final_score(
 # --------------------------------------------------
 
 def retrieve_assessments(
-
     query,
     state=None,
     top_k=5
-
 ):
 
     print(
@@ -140,110 +159,59 @@ def retrieve_assessments(
         flush=True
     )
 
-    try:
+    print(
+        "Creating embedding",
+        flush=True
+    )
 
-        print(
-            "Creating embedding",
-            flush=True
-        )
+    query_embedding = (
 
-        query_embedding = (
-            embedding_model
-            .encode(query)
-            .tolist()
-        )
+        embedding_model
+        .encode(query)
+        .tolist()
 
-        print(
-            "Embedding created",
-            flush=True
-        )
+    )
 
-        print(
-            "Loading client",
-            flush=True
-        )
+    print(
+        "Embedding created",
+        flush=True
+    )
 
-        print(
-            client,
-            flush=True
-        )
+    print(
+        "Testing collection",
+        flush=True
+    )
 
-        print(
-            "Before get_collection",
-            flush=True
-        )
+    print(
+        f"Collection count: {collection.count()}",
+        flush=True
+    )
 
-        collection = client.get_collection(
-            "shl_assessments"
-        )
+    results = collection.query(
 
-        print(
-            "After get_collection",
-            flush=True
-        )
+        query_embeddings=[
+            query_embedding
+        ],
 
-        print(
-            "Before count",
-            flush=True
-        )
+        n_results=15
 
-        cnt = collection.count()
+    )
 
-        print(
-            f"Collection count: {cnt}",
-            flush=True
-        )
-        return [
+    retrieved_docs = (
+        results["documents"][0]
+    )
 
-            {
-                "name":"DEBUG TEST",
+    metadatas = (
+        results["metadatas"][0]
+    )
 
-                "url":"test",
+    distances = (
+        results["distances"][0]
+    )
 
-                "test_type":"Assessment",
+    ranked_results = []
 
-                "description":"temporary",
-
-                "scores":{
-                    "final_score":1
-                }
-            }
-
-        ]
-
-    except Exception as e:
-
-        print(
-            "RETRIEVAL ERROR:",
-            str(e),
-            flush=True
-        )
-
-        return []
-
-
-    try:
-
-        retrieved_docs=results["documents"][0]
-
-        metadatas=results["metadatas"][0]
-
-        distances=results["distances"][0]
-
-    except Exception as e:
-
-        print(
-            "RESULT PARSING ERROR:",
-            str(e),
-            flush=True
-        )
-
-        return []
-
-
-    ranked_results=[]
-
-    for doc,metadata,distance in zip(
+    for doc, metadata, distance in zip(
 
         retrieved_docs,
         metadatas,
@@ -251,95 +219,103 @@ def retrieve_assessments(
 
     ):
 
-        role_score=(1-distance)
-
-        seniority_score=compute_seniority_score(
-            query,
-            metadata
+        role_score = (
+            1 - distance
         )
 
-        skills_score=compute_skills_score(
-            query,
-            metadata
+        seniority_score = (
+            compute_seniority_score(
+                query,
+                metadata
+            )
         )
 
-        final_score=compute_final_score(
+        skills_score = (
+            compute_skills_score(
+                query,
+                metadata
+            )
+        )
 
-            role_score,
-            seniority_score,
-            skills_score
-
+        final_score = (
+            compute_final_score(
+                role_score,
+                seniority_score,
+                skills_score
+            )
         )
 
         ranked_results.append({
 
             "name":
-            metadata.get(
-                "name",
-                ""
-            ),
+                metadata.get(
+                    "name",
+                    ""
+                ),
 
             "url":
-            metadata.get(
-                "url",
-                ""
-            ),
+                metadata.get(
+                    "url",
+                    ""
+                ),
 
             "test_type":
-            metadata.get(
-                "test_type"
-            )
-            or metadata.get(
-                "category"
-            )
-            or "Assessment",
+                metadata.get(
+                    "test_type"
+                )
+                or metadata.get(
+                    "category"
+                )
+                or "Assessment",
 
             "description":
-            doc,
+                doc,
 
-            "scores":{
+            "scores": {
 
                 "role_score":
-                round(
-                    role_score,
-                    3
-                ),
+                    round(
+                        role_score,
+                        3
+                    ),
 
                 "seniority_score":
-                round(
-                    seniority_score,
-                    3
-                ),
+                    round(
+                        seniority_score,
+                        3
+                    ),
 
                 "skills_score":
-                round(
-                    skills_score,
-                    3
-                ),
+                    round(
+                        skills_score,
+                        3
+                    ),
 
                 "final_score":
-                round(
-                    final_score,
-                    3
-                )
+                    round(
+                        final_score,
+                        3
+                    )
+
             }
 
         })
 
-
-    ranked_results=sorted(
+    ranked_results = sorted(
 
         ranked_results,
 
         key=lambda x:
-        x["scores"]["final_score"],
+        x["scores"][
+            "final_score"
+        ],
 
         reverse=True
 
     )
 
     print(
-        f"Returning {len(ranked_results)} results",
+        f"Retrieved count: {len(ranked_results[:top_k])}",
         flush=True
     )
 

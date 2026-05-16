@@ -4,23 +4,26 @@ import chromadb
 from rag.embeddings import embedding_model
 
 
+# --------------------------------------------------
+# CHROMA CONFIG
+# --------------------------------------------------
+
 CHROMA_PATH = "vector_db"
 
 client = chromadb.PersistentClient(
     path=CHROMA_PATH
 )
 
+collection = client.get_or_create_collection(
+    name="shl_assessments"
+)
 
-def get_collection():
 
-    return client.get_or_create_collection(
-        name="shl_assessments"
-    )
-
+# --------------------------------------------------
+# VECTOR DB CREATION
+# --------------------------------------------------
 
 def create_vector_db():
-
-    collection = get_collection()
 
     with open(
         "data/processed_assessments.json",
@@ -36,9 +39,7 @@ def create_vector_db():
 
     for idx, item in enumerate(data):
 
-        search_text = item[
-            "search_text"
-        ]
+        search_text = item["search_text"]
 
         embedding = (
             embedding_model
@@ -57,19 +58,19 @@ def create_vector_db():
         metadatas.append({
 
             "name":
-            item["name"],
+                item["name"],
 
             "url":
-            item["url"],
+                item["url"],
 
             "test_type":
-            item["test_type"],
+                item["test_type"],
 
             "duration":
-            item["duration"],
+                item["duration"],
 
             "remote_testing":
-            item["remote_testing"]
+                item["remote_testing"]
 
         })
 
@@ -77,17 +78,26 @@ def create_vector_db():
             str(idx)
         )
 
-    collection.add(
-        documents=documents,
-        embeddings=embeddings,
-        metadatas=metadatas,
-        ids=ids
-    )
+    # avoid duplicate inserts
+    if collection.count() == 0:
 
-    print(
-        "Vector DB created successfully"
-    )
+        collection.add(
+            documents=documents,
+            embeddings=embeddings,
+            metadatas=metadatas,
+            ids=ids
+        )
+
+        print(
+            "✅ Vector DB created successfully"
+        )
+
+    else:
+
+        print(
+            f"Collection already exists with {collection.count()} items"
+        )
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     create_vector_db()
