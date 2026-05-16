@@ -187,14 +187,19 @@ def retrieve_assessments(
         flush=True
     )
 
+    print(
+        "Before query",
+        flush=True
+    )
+
     results = collection.query(
+        query_embeddings=[query_embedding],
+        n_results=5
+    )
 
-        query_embeddings=[
-            query_embedding
-        ],
-
-        n_results=15
-
+    print(
+        "After query",
+        flush=True
     )
 
     retrieved_docs = (
