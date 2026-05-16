@@ -159,24 +159,32 @@ def retrieve_assessments(
         )
 
         print(
-            "Running Chroma query",
+            "Testing collection",
             flush=True
-        )
-
-        results = collection.query(
-
-            query_embeddings=[
-                query_embedding
-            ],
-
-            n_results=10
-
         )
 
         print(
-            "Query completed",
+            f"Collection count: {collection.count()}",
             flush=True
         )
+
+        return [
+
+            {
+                "name":"DEBUG TEST",
+
+                "url":"test",
+
+                "test_type":"Assessment",
+
+                "description":"temporary",
+
+                "scores":{
+                    "final_score":1
+                }
+            }
+
+        ]
 
     except Exception as e:
 
