@@ -1,6 +1,8 @@
 # rag/comparison.py
 
-from rag.vector_store import collection
+from rag.vector_store import get_collection
+
+collection = get_collection()
 
 
 def retrieve_specific_assessments(names):
