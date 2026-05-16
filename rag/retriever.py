@@ -183,7 +183,7 @@ def retrieve_assessments(
     )
 
     print(
-        f"Collection count: {collection.count()}",
+        "Collection loaded",
         flush=True
     )
 

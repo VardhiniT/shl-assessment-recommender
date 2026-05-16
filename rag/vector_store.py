@@ -14,16 +14,12 @@ client = chromadb.PersistentClient(
     path=CHROMA_PATH
 )
 
-collection = client.get_or_create_collection(
-    name="shl_assessments"
-)
-
 
 # --------------------------------------------------
 # VECTOR DB CREATION
 # --------------------------------------------------
 
-def create_vector_db():
+def create_vector_db(collection):
 
     with open(
         "data/processed_assessments.json",
@@ -32,16 +28,16 @@ def create_vector_db():
 
         data = json.load(f)
 
-    documents = []
-    embeddings = []
-    metadatas = []
-    ids = []
+    documents=[]
+    embeddings=[]
+    metadatas=[]
+    ids=[]
 
-    for idx, item in enumerate(data):
+    for idx,item in enumerate(data):
 
-        search_text = item["search_text"]
+        search_text=item["search_text"]
 
-        embedding = (
+        embedding=(
             embedding_model
             .encode(search_text)
             .tolist()
@@ -58,19 +54,19 @@ def create_vector_db():
         metadatas.append({
 
             "name":
-                item["name"],
+            item["name"],
 
             "url":
-                item["url"],
+            item["url"],
 
             "test_type":
-                item["test_type"],
+            item["test_type"],
 
             "duration":
-                item["duration"],
+            item["duration"],
 
             "remote_testing":
-                item["remote_testing"]
+            item["remote_testing"]
 
         })
 
@@ -78,26 +74,42 @@ def create_vector_db():
             str(idx)
         )
 
-    # avoid duplicate inserts
-    if collection.count() == 0:
+    collection.add(
+        documents=documents,
+        embeddings=embeddings,
+        metadatas=metadatas,
+        ids=ids
+    )
 
-        collection.add(
-            documents=documents,
-            embeddings=embeddings,
-            metadatas=metadatas,
-            ids=ids
-        )
-
-        print(
-            "✅ Vector DB created successfully"
-        )
-
-    else:
-
-        print(
-            f"Collection already exists with {collection.count()} items"
-        )
+    print(
+        "Vector DB created"
+    )
 
 
-if __name__ == "__main__":
-    create_vector_db()
+# --------------------------------------------------
+# LOAD / CREATE COLLECTION
+# --------------------------------------------------
+
+try:
+
+    collection=client.get_collection(
+        name="shl_assessments"
+    )
+
+    print(
+        "Loaded existing collection"
+    )
+
+except:
+
+    print(
+        "Creating new collection"
+    )
+
+    collection=client.create_collection(
+        name="shl_assessments"
+    )
+
+    create_vector_db(
+        collection
+    )
