@@ -181,22 +181,15 @@ def merge_recommendations(
 
 def chat(messages):
 
-    print("STEP 1: entered chat")
-
     turns_remaining = (
         MAX_TURNS - len(messages)
     )
-
-    print("STEP 2: turns calculated")
 
     # --------------------------------------
     # EXTRACT STATE
     # --------------------------------------
 
     state = extract_state(messages)
-
-    print("STEP 3: state extracted")
-    print("STATE:", state)
 
     # --------------------------------------
     # MISSING FIELDS
@@ -205,8 +198,6 @@ def chat(messages):
     missing_fields = get_missing_fields(
         state
     )
-
-    print("STEP 4: missing fields detected")
 
     # --------------------------------------
     # CONVERSATION ANALYSIS
@@ -219,9 +210,6 @@ def chat(messages):
         turns_remaining=turns_remaining
     )
 
-    print("STEP 5: conversation analyzed")
-    print("ANALYSIS:", analysis)
-
     intent = analysis["intent"]
 
     latest_user_message = (
@@ -229,6 +217,10 @@ def chat(messages):
     )
 
     recommendations = []
+
+    # --------------------------------------
+    # STRATEGIES THAT SHOULD NEVER RETRIEVE
+    # --------------------------------------
 
     NON_RECOMMENDATION_STRATEGIES = [
         "ask_clarification",
@@ -238,12 +230,14 @@ def chat(messages):
         "close_conversation"
     ]
 
+    # --------------------------------------
+    # NO RETRIEVAL CASES
+    # --------------------------------------
+
     if (
         analysis["response_strategy"]
         in NON_RECOMMENDATION_STRATEGIES
     ):
-
-        print("STEP 6: no retrieval branch")
 
         reply = generate_reply(
             strategy=analysis[
@@ -259,8 +253,6 @@ def chat(messages):
             messages=messages
         )
 
-        print("STEP 7: reply generated")
-
         return {
             "reply": reply,
             "recommendations": [],
@@ -268,13 +260,14 @@ def chat(messages):
                 "end_conversation"
             ]
         }
+    # --------------------------------------
+    # COMPARISON FLOW
+    # --------------------------------------
 
     if (
         analysis["response_strategy"]
         == "compare_assessments"
     ):
-
-        print("STEP 8: comparison branch")
 
         latest_message = (
             messages[-1]["content"]
@@ -303,8 +296,6 @@ def chat(messages):
             )
         )
 
-        print("STEP 9: comparison retrieval done")
-
         reply = generate_reply(
             strategy=analysis[
                 "response_strategy"
@@ -319,18 +310,20 @@ def chat(messages):
             messages=messages
         )
 
-        print("STEP 10: comparison reply generated")
-
         return {
             "reply": reply,
-            "recommendations": recommendations,
+
+            "recommendations":
+                recommendations,
+
             "end_of_conversation":
                 analysis[
                     "end_conversation"
                 ]
         }
-
-    print("STEP 11: building retrieval query")
+    # --------------------------------------
+    # BUILD RETRIEVAL QUERY
+    # --------------------------------------
 
     retrieval_query = (
         build_retrieval_query(
@@ -338,31 +331,14 @@ def chat(messages):
         )
     )
 
-    print("QUERY:", retrieval_query)
-
-    print("STEP 12: retrieving assessments")
+    # --------------------------------------
+    # RETRIEVE RESULTS
+    # --------------------------------------
 
     retrieved = retrieve_assessments(
         retrieval_query,
         state
     )
-
-    print(
-        f"Retrieved count: {len(retrieved)}",
-        flush=True
-    )
-
-    for item in retrieved[:5]:
-
-        print(
-            item.get(
-                "name",
-                "NO NAME"
-            ),
-            flush=True
-        )
-
-    print("STEP 13: retrieval complete")
 
     new_recommendations = (
         build_recommendations(
@@ -370,11 +346,11 @@ def chat(messages):
         )
     )
 
-    print("STEP 14: recommendations built")
+    # --------------------------------------
+    # REFINEMENT CONTINUITY
+    # --------------------------------------
 
     if intent == "refine":
-
-        print("STEP 15: refinement path")
 
         previous_recommendations = (
             extract_previous_recommendations(
@@ -395,7 +371,9 @@ def chat(messages):
             new_recommendations
         )
 
-    print("STEP 16: generating reply")
+    # --------------------------------------
+    # GENERATE REPLY
+    # --------------------------------------
 
     reply = generate_reply(
         strategy=analysis[
@@ -411,11 +389,15 @@ def chat(messages):
         messages=messages
     )
 
-    print("STEP 17: completed")
+    # --------------------------------------
+    # FINAL RESPONSE
+    # --------------------------------------
 
     return {
         "reply": reply,
+
         "recommendations": recommendations,
+
         "end_of_conversation": analysis[
             "end_conversation"
         ]

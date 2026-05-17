@@ -1,3 +1,5 @@
+# rag/comparison.py
+
 from rag.vector_store import collection
 
 
@@ -18,46 +20,20 @@ def retrieve_specific_assessments(names):
 
         for name in names:
 
-            name_clean = (
-                name
-                .strip()
-                .lower()
-            )
-
-            if (
-                len(name_clean) > 4
-                and name_clean in title
-            ):
+            if name.lower() in title:
 
                 results.append({
-
-                    "name":
-                        metadata.get(
-                            "name",
-                            ""
-                        ),
-
-                    "url":
-                        metadata.get(
-                            "url",
-                            ""
-                        ),
-
-                    "test_type":
-                        metadata.get(
-                            "test_type"
-                        )
-                        or metadata.get(
-                            "category"
-                        )
-                        or "Assessment",
-
-                    "description":
-                        metadata.get(
-                            "description",
-                            ""
-                        )
-
+                    "name": metadata.get("name", ""),
+                    "url": metadata.get("url", ""),
+                    "test_type": (
+                        metadata.get("test_type")
+                        or metadata.get("category")
+                        or "Assessment"
+                    ),
+                    "description": metadata.get(
+                        "description",
+                        ""
+                    )
                 })
 
     return results
