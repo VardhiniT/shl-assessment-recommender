@@ -8,11 +8,7 @@ from rag.embeddings import embedding_model
 # CHROMA CONFIG
 # --------------------------------------------------
 
-CHROMA_PATH = "vector_db"
-
-client = chromadb.PersistentClient(
-    path=CHROMA_PATH
-)
+client = chromadb.Client()
 
 
 # --------------------------------------------------
@@ -87,29 +83,17 @@ def create_vector_db(collection):
 
 
 # --------------------------------------------------
-# LOAD / CREATE COLLECTION
+# CREATE COLLECTION
 # --------------------------------------------------
 
-try:
+print(
+    "Creating collection"
+)
 
-    collection=client.get_collection(
-        name="shl_assessments"
-    )
+collection = client.get_or_create_collection(
+    name="shl_assessments"
+)
 
-    print(
-        "Loaded existing collection"
-    )
-
-except:
-
-    print(
-        "Creating new collection"
-    )
-
-    collection=client.create_collection(
-        name="shl_assessments"
-    )
-
-    create_vector_db(
-        collection
-    )
+create_vector_db(
+    collection
+)
